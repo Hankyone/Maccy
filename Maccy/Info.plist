@@ -33,7 +33,7 @@
 	<key>SUEnableInstallerLauncherService</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/Hankyone/Maccy/tahoe-fixes/appcast.xml</string>
+	<string>https://raw.githubusercontent.com/Hankyone/Maccy/master/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>8Nl04DDyilNOz1MSTAhs9zvY8Xu0EW0mTqpTdIu3IPU=</string>
 </dict>
