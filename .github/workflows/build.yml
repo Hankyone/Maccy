@@ -46,7 +46,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
           # Add to search list
-          security list-keychains -d "$RUNNER_TEMP" -s "$KEYCHAIN_PATH" login.keychain-db
+          security list-keychains -s "$KEYCHAIN_PATH" login.keychain-db
 
           # Verify
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
