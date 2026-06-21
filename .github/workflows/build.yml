@@ -19,8 +19,10 @@ jobs:
 
       - name: Select Xcode
         run: |
-          ls /Applications/ | grep Xcode
-          sudo xcode-select -s /Applications/Xcode_*.app/Contents/Developer || true
+          # Prefer the latest Xcode available (26.x for macOS 26+ APIs)
+          LATEST=$(ls -d /Applications/Xcode_*.app /Applications/Xcode.app 2>/dev/null | sort -V | tail -1)
+          echo "Selecting $LATEST"
+          sudo xcode-select -s "$LATEST/Contents/Developer"
           xcodebuild -version
 
       - name: Import signing certificate
@@ -53,6 +55,7 @@ jobs:
 
       - name: Build
         run: |
+          set -o pipefail
           xcodebuild \
             -project Maccy.xcodeproj \
             -scheme Maccy \
@@ -64,7 +67,7 @@ jobs:
             CODE_SIGNING_REQUIRED=YES \
             CODE_SIGNING_ALLOWED=YES \
             -destination 'generic/platform=macOS' \
-            2>&1 | tee build.log | tail -20
+            2>&1 | tee build.log | tail -50
 
       - name: Re-sign bundle (inside-out, Developer ID)
         run: |
