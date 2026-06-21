@@ -134,7 +134,7 @@ jobs:
 
           Updates are signed with EdDSA and verified by Sparkle automatically."
 
-          # Update appcast.xml with the new entry
+          # Update appcast-custom.xml with the new entry
           python3 << PYTHON
           import xml.etree.ElementTree as ET
 
@@ -148,7 +148,7 @@ jobs:
           ET.register_namespace('sparkle', 'http://www.andymatuschak.org/xml-namespaces/sparkle')
           ET.register_namespace('dc', 'http://purl.org/dc/elements/1.1/')
 
-          tree = ET.parse('appcast.xml')
+          tree = ET.parse('appcast-custom.xml')
           channel = tree.find('channel')
 
           # Remove existing item with same version if present
@@ -171,12 +171,12 @@ jobs:
           enc.set('type', 'application/octet-stream')
           enc.set('{http://www.andymatuschak.org/xml-namespaces/sparkle}edSignature', signature)
 
-          tree.write('appcast.xml', encoding='utf-8', xml_declaration=True)
+          tree.write('appcast-custom.xml', encoding='utf-8', xml_declaration=True)
           PYTHON
 
-          # Commit and push updated appcast.xml
+          # Commit and push updated appcast-custom.xml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add appcast.xml
+          git add appcast-custom.xml
           git commit -m "Update appcast for $TAG ($SHORT)"
           git push origin HEAD:master

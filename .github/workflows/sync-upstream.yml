@@ -55,6 +55,34 @@ jobs:
           git push origin master --force-with-lease
           echo "rebased=true" >> "$GITHUB_OUTPUT"
 
+      - name: Auto-tag new release after successful rebase
+        if: steps.check.outputs.changed == 'true' && steps.rebase.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Read version from the Xcode project
+          SHORT=$(grep "MARKETING_VERSION" Maccy.xcodeproj/project.pbxproj | head -1 | sed 's/.*= *//;s/;.*//')
+          VERSION=$(grep "CURRENT_PROJECT_VERSION" Maccy.xcodeproj/project.pbxproj | head -1 | sed 's/.*= *//;s/;.*//')
+
+          if [ -z "$SHORT" ] || [ -z "$VERSION" ]; then
+            echo "Could not read version, skipping auto-tag"
+            exit 0
+          fi
+
+          TAG="v${SHORT}-${VERSION}-custom"
+          # Check if tag already exists
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping"
+            exit 0
+          fi
+
+          echo "Creating tag $TAG"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+          # This tag push triggers the build workflow which will:
+          # build, sign, create release, and update appcast-custom.xml
+
       - name: Open PR on conflict
         if: steps.check.outputs.changed == 'true' && steps.rebase.outcome == 'failure'
         env:
