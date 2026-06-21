@@ -3,6 +3,7 @@ name: Build Maccy
 on:
   push:
     branches: [tahoe-fixes]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -53,10 +54,54 @@ jobs:
           codesign --force -s - --entitlements Maccy/Maccy.entitlements "$APP"
           codesign --verify --deep --strict "$APP" && echo "Signature OK"
 
+      - name: Read version info
+        id: version
+        run: |
+          APP="build/Build/Products/Release/Maccy.app"
+          SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Contents/Info.plist")
+          echo "short=$SHORT" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version $SHORT ($VERSION)"
+
       - name: Create ZIP
         run: |
           cd build/Build/Products/Release
           ditto -c -k --keepParent Maccy.app Maccy.zip
+
+      - name: Sign update with Sparkle EdDSA
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          cat > /tmp/sign_update.swift << 'SWIFT'
+          import Foundation
+          import CryptoKit
+
+          let args = CommandLine.arguments
+          guard args.count >= 3 else {
+              FileHandle.standardError.write("Usage: sign_update <zipPath> <privateKeyBase64>\n".data(using: .utf8)!)
+              exit(1)
+          }
+          let zipPath = args[1]
+          let privateKeyBase64 = args[2]
+
+          guard let privateKeyData = Data(base64Encoded: privateKeyBase64) else {
+              FileHandle.standardError.write("Invalid private key base64\n".data(using: .utf8)!)
+              exit(1)
+          }
+
+          let zipData = try! Data(contentsOf: URL(fileURLWithPath: zipPath))
+          let privateKey = try! Curve25519.Signing.PrivateKey(rawRepresentation: privateKeyData)
+          let signature = try! privateKey.signature(for: zipData)
+          print(signature.base64EncodedString())
+          SWIFT
+
+          SIGNATURE=$(swift /tmp/sign_update.swift \
+            build/Build/Products/Release/Maccy.zip \
+            "$SPARKLE_PRIVATE_KEY")
+          echo "SPARKLE_SIGNATURE=$SIGNATURE" >> "$GITHUB_ENV"
+          echo "Update signature: $SIGNATURE"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -65,13 +110,73 @@ jobs:
           path: build/Build/Products/Release/Maccy.zip
           retention-days: 90
 
-      - name: Create release on tag push
+      - name: Create release and update appcast
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SPARKLE_SIGNATURE: ${{ env.SPARKLE_SIGNATURE }}
+          SHORT: ${{ steps.version.outputs.short }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           TAG=${GITHUB_REF#refs/tags/}
+          ZIP_PATH="build/Build/Products/Release/Maccy.zip"
+          ZIP_SIZE=$(stat -f%z "$ZIP_PATH")
+          DOWNLOAD_URL="https://github.com/Hankyone/Maccy/releases/download/${TAG}/Maccy.zip"
+          PUB_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S +0000")
+
+          # Create GitHub release with the zip
           gh release create "$TAG" \
-            build/Build/Products/Release/Maccy.zip \
-            --title "Maccy $TAG" \
-            --notes "Custom build with Tahoe fixes. Ad-hoc signed — re-grant accessibility/clipboard permissions on first launch."
+            "$ZIP_PATH" \
+            --title "Maccy $SHORT" \
+            --notes "Custom build with Tahoe fixes (version $SHORT, build $VERSION).
+
+          Ad-hoc signed — re-grant accessibility/clipboard permissions on first launch.
+
+          Updates are signed with EdDSA and verified by Sparkle automatically."
+
+          # Update appcast.xml with the new entry
+          python3 << PYTHON
+          import xml.etree.ElementTree as ET
+
+          short = "$SHORT"
+          version = "$VERSION"
+          download_url = "$DOWNLOAD_URL"
+          zip_size = "$ZIP_SIZE"
+          signature = "$SPARKLE_SIGNATURE"
+          pub_date = "$PUB_DATE"
+
+          ET.register_namespace('sparkle', 'http://www.andymatuschak.org/xml-namespaces/sparkle')
+          ET.register_namespace('dc', 'http://purl.org/dc/elements/1.1/')
+
+          tree = ET.parse('appcast.xml')
+          channel = tree.find('channel')
+
+          # Remove existing item with same version if present
+          for item in channel.findall('item'):
+              t = item.find('title')
+              if t is not None and t.text == short:
+                  channel.remove(item)
+
+          item = ET.SubElement(channel, 'item')
+          ET.SubElement(item, 'title').text = short
+          ET.SubElement(item, 'description').text = f'Custom build {short} ({version}) with Tahoe fixes.'
+          ET.SubElement(item, 'pubDate').text = pub_date
+          ET.SubElement(item, '{http://www.andymatuschak.org/xml-namespaces/sparkle}minimumSystemVersion').text = '14.0'
+
+          enc = ET.SubElement(item, 'enclosure')
+          enc.set('url', download_url)
+          enc.set('{http://www.andymatuschak.org/xml-namespaces/sparkle}version', version)
+          enc.set('{http://www.andymatuschak.org/xml-namespaces/sparkle}shortVersionString', short)
+          enc.set('length', zip_size)
+          enc.set('type', 'application/octet-stream')
+          enc.set('{http://www.andymatuschak.org/xml-namespaces/sparkle}edSignature', signature)
+
+          tree.write('appcast.xml', encoding='utf-8', xml_declaration=True)
+          PYTHON
+
+          # Commit and push updated appcast.xml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          git commit -m "Update appcast for $TAG ($SHORT)"
+          git push origin HEAD:tahoe-fixes
