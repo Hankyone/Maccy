@@ -1,0 +1,77 @@
+name: Build Maccy
+
+on:
+  push:
+    branches: [tahoe-fixes]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          ls /Applications/ | grep Xcode
+          sudo xcode-select -s /Applications/Xcode_*.app/Contents/Developer || true
+          xcodebuild -version
+
+      - name: Build
+        run: |
+          xcodebuild \
+            -project Maccy.xcodeproj \
+            -scheme Maccy \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=YES \
+            -destination 'generic/platform=macOS' \
+            2>&1 | tee build.log | tail -20
+
+      - name: Re-sign bundle (inside-out, ad-hoc)
+        run: |
+          APP="build/Build/Products/Release/Maccy.app"
+
+          # Re-sign XPC services inside Sparkle
+          for xpc in "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices"/*.xpc; do
+            codesign --force -s - "$xpc"
+          done
+          codesign --force -s - "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app"
+          codesign --force -s - "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"
+          codesign --force -s - "$APP/Contents/Frameworks/Sparkle.framework"
+
+          # Re-sign app with sandbox entitlements
+          codesign --force -s - --entitlements Maccy/Maccy.entitlements "$APP"
+          codesign --verify --deep --strict "$APP" && echo "Signature OK"
+
+      - name: Create ZIP
+        run: |
+          cd build/Build/Products/Release
+          ditto -c -k --keepParent Maccy.app Maccy.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Maccy-app
+          path: build/Build/Products/Release/Maccy.zip
+          retention-days: 90
+
+      - name: Create release on tag push
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          gh release create "$TAG" \
+            build/Build/Products/Release/Maccy.zip \
+            --title "Maccy $TAG" \
+            --notes "Custom build with Tahoe fixes. Ad-hoc signed — re-grant accessibility/clipboard permissions on first launch."
