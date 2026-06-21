@@ -76,11 +76,21 @@ class FloatingPanel<Content: View>: NSPanel, NSWindowDelegate {
   func open(height: CGFloat, at popupPosition: PopupPosition = Defaults[.popupPosition]) {
     let size = Defaults[.windowSize]
     let miniumHeight: CGFloat = AppState.shared.popup.minimumHeight
-    let finalWidth = min(frame.width, size.width)
-    let finalHeight = max(min(height, size.height), miniumHeight)
-    setContentSize(NSSize(width: finalWidth, height: finalHeight))
-    setFrameOrigin(popupPosition.origin(size: frame.size, statusBarButton: statusBarButton))
+    let newSize = NSSize(width: min(frame.width, size.width), height: max(min(height, size.height), miniumHeight))
+    let newOrigin = popupPosition.origin(size: newSize, statusBarButton: statusBarButton)
+
+    // setFrame(_:display:) flushes the frame synchronously. On macOS 27 (Tahoe),
+    // setContentSize + setFrameOrigin are coalesced into the next runloop flush,
+    // while orderFrontRegardless() puts the window on screen at its last-committed
+    // frame — causing a visible jump from the old position to the cursor.
+    // Setting the full frame atomically with display: true avoids that.
+    setFrame(NSRect(origin: newOrigin, size: newSize), display: true)
+
+    // Make the order-front atomic with the frame change so no intermediate
+    // frame is ever composited on screen.
+    disableScreenUpdatesUntilFlush()
     orderFrontRegardless()
+
     makeKey()
     isPresented = true
 
