@@ -64,6 +64,23 @@ enum PopupPosition: String, CaseIterable, Identifiable, CustomStringConvertible,
 
     var point = NSEvent.mouseLocation
     point.y -= size.height
+
+    // Clamp to visible screen frame so the popup stays on screen when
+    // opened near an edge (e.g. bottom of screen flips it upward).
+    if let screen = NSScreen.forPopup ?? NSScreen.main {
+      let visibleFrame = screen.visibleFrame
+      if point.y < visibleFrame.minY {
+        // Not enough room below the cursor; open upward from the cursor instead.
+        point.y = NSEvent.mouseLocation.y
+      }
+      if point.x < visibleFrame.minX {
+        point.x = visibleFrame.minX
+      }
+      if point.x + size.width > visibleFrame.maxX {
+        point.x = visibleFrame.maxX - size.width
+      }
+    }
+
     return point
   }
 }
