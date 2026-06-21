@@ -1,9 +1,9 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
   <channel>
     <title>Maccy (custom)</title>
     <link>https://raw.githubusercontent.com/Hankyone/Maccy/master/appcast-custom.xml</link>
     <description>Custom builds with Tahoe fixes.</description>
     <language>en</language>
-  </channel>
+  <item><title>2.6.1</title><description>Custom build 2.6.1 (60) with Tahoe fixes.</description><pubDate>Sun, 21 Jun 2026 18:29:21 +0000</pubDate><sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion><enclosure url="https://github.com/Hankyone/Maccy/releases/download/v2.6.1-60-custom/Maccy.zip" sparkle:version="60" sparkle:shortVersionString="2.6.1" length="1985377" type="application/octet-stream" sparkle:edSignature="rdE177EGk9atx6jd8dSNjSaXHkBWzPKhOup1j9TpjSswEHqkpAvF4yWHnWSqMxkmT0liaGieoUupXlmBNi7dCg==" /></item></channel>
 </rss>
