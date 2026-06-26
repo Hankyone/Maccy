@@ -144,6 +144,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
   @MainActor
   private func migrateUserDefaults() {
+    // One-time migration from old bundle ID (org.p0deje.Maccy) to new (ca.anouar.maccypu)
+    ensureMigration(key: "bundle-id-migration") {
+      if let oldDefaults = UserDefaults(suiteName: "org.p0deje.Maccy") {
+        let keysToMigrate = [
+          "KeyboardShortcuts_pin",
+          "KeyboardShortcuts_popup",
+          "KeyboardShortcuts_delete",
+          "KeyboardShortcuts_togglePreview",
+          "windowSize",
+          "previewWidth",
+          "showSearch",
+          "showTitle",
+          "showFooter",
+          "menuIcon",
+          "pasteByDefault",
+          "removeFormattingByDefault",
+          "searchMode",
+          "searchVisibility",
+          "enabledPasteboardTypes",
+          "ignoredApps",
+          "popupPosition",
+          "popupScreen",
+          "pinTo",
+          "previewDelay",
+          "imageMaxHeight",
+          "highlightMatch",
+          "showApplicationIcons",
+          "clearOnQuit",
+          "avoidTakingFocus",
+          "saratovSeparator"
+        ]
+        for key in keysToMigrate {
+          if let value = oldDefaults.object(forKey: key) {
+            UserDefaults.standard.set(value, forKey: key)
+          }
+        }
+      }
+    }
+
     ensureMigration(key: "2024-07-01-version-2") {
       // Start 2.x from scratch.
       Defaults.reset(.migrations)
