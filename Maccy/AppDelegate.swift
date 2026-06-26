@@ -134,6 +134,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSHomeDirectory(), realHome, oldPrefsURL.path,
             FileManager.default.fileExists(atPath: oldPrefsURL.path))
 
+      // Also write to a debug file since NSLog may be filtered
+      let debugLog = "NSHomeDirectory=\(NSHomeDirectory())\nrealHome=\(realHome)\noldPrefsPath=\(oldPrefsURL.path)\nexists=\(FileManager.default.fileExists(atPath: oldPrefsURL.path))\n"
+      try? debugLog.write(toFile: "/tmp/maccy-migration-debug.log", atomically: true, encoding: .utf8)
+
       var migrated = false
       if FileManager.default.fileExists(atPath: oldPrefsURL.path),
          let oldPrefs = NSDictionary(contentsOf: oldPrefsURL) as? [String: Any] {
@@ -174,9 +178,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
           }
         }
         NSLog("Maccy migration: migrated %d keys", migratedCount)
+        try? "migrated \(migratedCount) keys\n".write(toFile: "/tmp/maccy-migration-debug.log", atomically: true, encoding: .utf8)
         migrated = true
       } else {
         NSLog("Maccy migration: could not read old prefs file")
+        try? "could not read old prefs file\n".write(toFile: "/tmp/maccy-migration-debug.log", atomically: true, encoding: .utf8)
       }
       // Only mark migration as done if we successfully read the old prefs.
       // If the file couldn't be read (e.g. containerized filesystem restrictions),
