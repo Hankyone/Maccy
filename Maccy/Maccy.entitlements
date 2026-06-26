@@ -8,8 +8,8 @@
 	<true/>
 	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
 	<array>
-    	<string>org.p0deje.Maccy-spks</string>
-    	<string>org.p0deje.Maccy-spki</string>
+    	<string>app.maccypu-spks</string>
+    	<string>app.maccypu-spki</string>
 	</array>
 </dict>
 </plist>
