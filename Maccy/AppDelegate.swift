@@ -146,7 +146,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   private func migrateUserDefaults() {
     // One-time migration from old bundle ID (org.p0deje.Maccy) to new (ca.anouar.maccypu)
     ensureMigration(key: "bundle-id-migration") {
-      if let oldDefaults = UserDefaults(suiteName: "org.p0deje.Maccy") {
+      // Read the old plist file directly — UserDefaults(suiteName:) doesn't work
+      // because macOS containerizes the app and redirects suite lookups to the
+      // new container instead of ~/Library/Preferences/.
+      let oldPrefsURL = URL(fileURLWithPath: NSHomeDirectory())
+        .appendingPathComponent("Library/Preferences/org.p0deje.Maccy.plist")
+
+      if FileManager.default.fileExists(atPath: oldPrefsURL.path),
+         let oldPrefs = NSDictionary(contentsOf: oldPrefsURL) as? [String: Any] {
         let keysToMigrate = [
           "KeyboardShortcuts_pin",
           "KeyboardShortcuts_popup",
@@ -176,7 +183,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
           "saratovSeparator"
         ]
         for key in keysToMigrate {
-          if let value = oldDefaults.object(forKey: key) {
+          if let value = oldPrefs[key] {
             UserDefaults.standard.set(value, forKey: key)
           }
         }
