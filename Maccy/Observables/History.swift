@@ -13,7 +13,17 @@ class History: ItemsContainer { // swiftlint:disable:this type_body_length
   static let shared = History()
   let logger = Logger(label: "org.p0deje.Maccy")
 
-  var items: [HistoryItemDecorator] = []
+  var items: [HistoryItemDecorator] = [] {
+    didSet {
+      itemsById = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+    }
+  }
+  private var itemsById: [UUID: HistoryItemDecorator] = [:]
+
+  func item(for id: UUID) -> HistoryItemDecorator? {
+    return itemsById[id]
+  }
+
   var pasteStack: PasteStack?
 
   var pinnedItems: [HistoryItemDecorator] { items.filter(\.isPinned) }
