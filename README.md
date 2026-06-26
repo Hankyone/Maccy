@@ -1,6 +1,18 @@
 
 <img width="128px" src="https://maccy.app/img/maccy/Logo.png" alt="Logo" />
 
+# Maccy Pro Plus Ultra
+
+A custom fork of [Maccy](https://maccy.app) with enhancements for macOS 27.
+
+## What's different
+
+- **macOS 27 compatibility** — Fixed popup position jumping and edge clamping issues caused by changes to window frame coalescing in macOS 27.
+- **Double-click images to open in Preview** — Click any image in the slideout preview to open it full-size in Preview.app.
+- **Improved scroll and hover performance** — Cached expensive property lookups, O(1) item selection, and reduced unnecessary view re-renders for a noticeably snappier experience.
+
+---
+
 # [Maccy](https://maccy.app)
 
 [![Downloads](https://img.shields.io/github/downloads/p0deje/Maccy/total.svg)](https://github.com/p0deje/Maccy/releases/latest)

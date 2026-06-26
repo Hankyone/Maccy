@@ -31,7 +31,7 @@ body:
   - type: textarea
     attributes:
       label: Maccy Settings
-      description: Provide the output from running 'defaults read org.p0deje.Maccy' in Terminal.app.
+      description: Provide the output from running 'defaults read app.maccypu' in Terminal.app.
       render: Shell
     validations:
       required: false
