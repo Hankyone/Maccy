@@ -4,32 +4,22 @@ private struct HoverSelectionModifier: ViewModifier {
   @Environment(AppState.self) private var appState
   var id: UUID
 
-  // When the preview is open, delay selection changes so the user can
-  // move the mouse toward the preview without triggering intermediate items.
-  // This mimics the "safe triangle" hysteresis that NSMenu provides natively.
-  static let previewHoverDelay: UInt64 = 150_000_000 // 150ms in nanoseconds
+  // Short debounce for normal hover — fast enough to feel responsive,
+  // but coalesces rapid hover events from scrolling into a single selection.
+  static let hoverDebounce: UInt64 = 50_000_000 // 50ms
 
-  // During scrolling, items move under a stationary cursor and fire onHover.
-  // Ignore these by checking if the mouse actually moved recently.
-  static let mouseMoveTimeout: Duration = .milliseconds(200)
+  // Longer delay when preview is open so the user can sweep the mouse
+  // toward the preview without each intermediate item becoming selected.
+  // This mimics the "safe triangle" hysteresis that NSMenu provides natively.
+  static let previewHoverDelay: UInt64 = 150_000_000 // 150ms
 
   func body(content: Content) -> some View {
     content.onHover { hovering in
       if hovering {
-        // Skip hover events that come from scrolling (mouse hasn't actually moved)
-        if !HoverSelectionCoordinator.shared.mouseMovedRecently() {
-          return
-        }
-
-        if appState.preview.state.isOpen {
-          // Delay selection when preview is open so the user can sweep
-          // the mouse across items toward the preview without each
-          // intermediate item becoming selected.
-          HoverSelectionCoordinator.shared.scheduleHover(id: id) {
-            performSelection()
-          }
-        } else {
-          HoverSelectionCoordinator.shared.cancel()
+        let delay = appState.preview.state.isOpen
+          ? HoverSelectionModifier.previewHoverDelay
+          : HoverSelectionModifier.hoverDebounce
+        HoverSelectionCoordinator.shared.scheduleHover(id: id, delay: delay) {
           performSelection()
         }
       }
@@ -49,13 +39,17 @@ private struct HoverSelectionModifier: ViewModifier {
 final class HoverSelectionCoordinator {
   static let shared = HoverSelectionCoordinator()
   private var pendingTask: Task<Void, Never>?
-  private var lastMouseMovedAt: ContinuousClock.Instant = .now
+  private var lastScheduledId: UUID?
 
-  func scheduleHover(id: UUID, action: @escaping () -> Void) {
+  func scheduleHover(id: UUID, delay: UInt64, action: @escaping () -> Void) {
+    // If the same item is already pending, don't reschedule
+    guard lastScheduledId != id else { return }
+    lastScheduledId = id
     pendingTask?.cancel()
     pendingTask = Task { @MainActor in
-      try? await Task.sleep(nanoseconds: HoverSelectionModifier.previewHoverDelay)
+      try? await Task.sleep(nanoseconds: delay)
       guard !Task.isCancelled else { return }
+      lastScheduledId = nil
       action()
     }
   }
@@ -63,15 +57,7 @@ final class HoverSelectionCoordinator {
   func cancel() {
     pendingTask?.cancel()
     pendingTask = nil
-  }
-
-  func recordMouseMove() {
-    lastMouseMovedAt = .now
-  }
-
-  func mouseMovedRecently() -> Bool {
-    let elapsed = ContinuousClock.now - lastMouseMovedAt
-    return elapsed <= HoverSelectionModifier.mouseMoveTimeout
+    lastScheduledId = nil
   }
 }
 

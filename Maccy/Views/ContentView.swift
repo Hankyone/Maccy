@@ -43,7 +43,6 @@ struct ContentView: View {
             }
             .onMouseMove {
               appState.navigator.isKeyboardNavigating = false
-              HoverSelectionCoordinator.shared.recordMouseMove()
             }
           } slideout: {
             SlideoutContentView()
