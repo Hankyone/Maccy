@@ -178,7 +178,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
           }
         }
         NSLog("Maccy migration: migrated %d keys", migratedCount)
-        try? "migrated \(migratedCount) keys\n".write(toFile: "/tmp/maccy-migration-debug.log", atomically: true, encoding: .utf8)
+        var debugDetail = "migrated \(migratedCount) keys:\n"
+        for key in keysToMigrate {
+          if oldPrefs[key] != nil {
+            debugDetail += "  \(key) = \(oldPrefs[key]!)\n"
+          }
+        }
+        debugDetail += "\nUserDefaults.standard after migration:\n"
+        for key in keysToMigrate {
+          if let val = UserDefaults.standard.object(forKey: key) {
+            debugDetail += "  \(key) = \(val)\n"
+          }
+        }
+        try? debugDetail.write(toFile: "/tmp/maccy-migration-debug.log", atomically: true, encoding: .utf8)
         migrated = true
       } else {
         NSLog("Maccy migration: could not read old prefs file")
