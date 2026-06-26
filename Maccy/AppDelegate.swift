@@ -121,10 +121,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   private func migrateUserDefaults() {
     // One-time migration from old bundle ID (org.p0deje.Maccy) to new (ca.anouar.maccypu)
     if Defaults[.migrations]["bundle-id-migration"] != true {
-      // Read the old plist file directly — UserDefaults(suiteName:) doesn't work
-      // because macOS containerizes the app and redirects suite lookups to the
-      // new container instead of ~/Library/Preferences/.
-      let oldPrefsURL = URL(fileURLWithPath: NSHomeDirectory())
+      // NSHomeDirectory() returns the container path on macOS 27, even without
+      // sandbox entitlements. Use getpwuid to get the real home directory.
+      var realHome = NSHomeDirectory()
+      if let pw = getpwuid(getuid()) {
+        realHome = String(cString: pw.pointee.pw_dir)
+      }
+      let oldPrefsURL = URL(fileURLWithPath: realHome)
         .appendingPathComponent("Library/Preferences/org.p0deje.Maccy.plist")
 
       if FileManager.default.fileExists(atPath: oldPrefsURL.path),
