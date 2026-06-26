@@ -184,7 +184,7 @@ jobs:
           gh release create "$TAG" \
             "$ZIP_PATH" \
             --title "Maccy $SHORT" \
-            --notes "Custom build with Tahoe fixes (version $SHORT, build $VERSION).
+            --notes "Custom build with macOS 27 fixes (version $SHORT, build $VERSION).
 
           Signed with Developer ID and notarized by Apple.
 
@@ -215,7 +215,7 @@ jobs:
 
           item = ET.SubElement(channel, 'item')
           ET.SubElement(item, 'title').text = short
-          ET.SubElement(item, 'description').text = f'Custom build {short} ({version}) with Tahoe fixes.'
+          ET.SubElement(item, 'description').text = f'Custom build {short} ({version}) with macOS 27 fixes.'
           ET.SubElement(item, 'pubDate').text = pub_date
           ET.SubElement(item, '{http://www.andymatuschak.org/xml-namespaces/sparkle}minimumSystemVersion').text = '14.0'
 
