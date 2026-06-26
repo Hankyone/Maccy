@@ -130,8 +130,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
       let oldPrefsURL = URL(fileURLWithPath: realHome)
         .appendingPathComponent("Library/Preferences/org.p0deje.Maccy.plist")
 
+      NSLog("Maccy migration: NSHomeDirectory=%@, realHome=%@, oldPrefsPath=%@, exists=%d",
+            NSHomeDirectory(), realHome, oldPrefsURL.path,
+            FileManager.default.fileExists(atPath: oldPrefsURL.path))
+
+      var migrated = false
       if FileManager.default.fileExists(atPath: oldPrefsURL.path),
          let oldPrefs = NSDictionary(contentsOf: oldPrefsURL) as? [String: Any] {
+        NSLog("Maccy migration: found %d keys in old prefs", oldPrefs.count)
         let keysToMigrate = [
           "KeyboardShortcuts_pin",
           "KeyboardShortcuts_popup",
@@ -160,13 +166,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
           "avoidTakingFocus",
           "saratovSeparator"
         ]
+        var migratedCount = 0
         for key in keysToMigrate {
           if let value = oldPrefs[key] {
             UserDefaults.standard.set(value, forKey: key)
+            migratedCount += 1
           }
         }
+        NSLog("Maccy migration: migrated %d keys", migratedCount)
+        migrated = true
+      } else {
+        NSLog("Maccy migration: could not read old prefs file")
       }
-      Defaults[.migrations]["bundle-id-migration"] = true
+      // Only mark migration as done if we successfully read the old prefs.
+      // If the file couldn't be read (e.g. containerized filesystem restrictions),
+      // we'll retry on next launch.
+      if migrated {
+        Defaults[.migrations]["bundle-id-migration"] = true
+      }
+    } else {
+      NSLog("Maccy migration: already done, skipping")
     }
 
     if Defaults[.migrations]["2024-07-01-version-2"] != true {
