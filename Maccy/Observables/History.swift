@@ -11,7 +11,7 @@ import SwiftData
 @Observable
 class History: ItemsContainer { // swiftlint:disable:this type_body_length
   static let shared = History()
-  let logger = Logger(label: "app.maccypu")
+  let logger = Logger(label: "ca.anouar.maccypu")
 
   var items: [HistoryItemDecorator] = [] {
     didSet {
