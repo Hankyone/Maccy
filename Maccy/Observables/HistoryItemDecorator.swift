@@ -10,7 +10,18 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
     return lhs.id == rhs.id
   }
 
-  static var previewImageSize: NSSize { NSScreen.forPopup?.visibleFrame.size ?? NSSize(width: 2048, height: 1536) }
+  static var previewImageSize: NSSize {
+    // Cap at 1200px on the longest side — plenty for the slideout preview
+    // (typically ~400px wide) even on Retina, but far cheaper to generate
+    // than full screen resolution (which was ~3000x2000).
+    let maxDimension: CGFloat = 1200
+    if let screen = NSScreen.forPopup?.visibleFrame.size {
+      let longest = max(screen.width, screen.height)
+      let scale = min(1.0, maxDimension / longest)
+      return NSSize(width: screen.width * scale, height: screen.height * scale)
+    }
+    return NSSize(width: 1200, height: 900)
+  }
   static var thumbnailImageSize: NSSize { NSSize(width: 340, height: Defaults[.imageMaxHeight]) }
 
   let id = UUID()

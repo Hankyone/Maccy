@@ -11,6 +11,42 @@ struct PreviewItemView: View {
       .clipShape(.rect(cornerRadius: 5))
   }
 
+  private func openInPreview() {
+    guard let data = item.item.imageData else { return }
+
+    let imageTypes: Set<String> = [
+      NSPasteboard.PasteboardType.png.rawValue,
+      NSPasteboard.PasteboardType.tiff.rawValue,
+      "public.jpeg",
+      "public.heic"
+    ]
+    let ext = item.item.contents.first(where: { imageTypes.contains($0.type) })?.type ?? "tiff"
+    let fileExt: String
+    switch ext {
+    case NSPasteboard.PasteboardType.png.rawValue: fileExt = "png"
+    case NSPasteboard.PasteboardType.tiff.rawValue: fileExt = "tiff"
+    case "public.jpeg": fileExt = "jpg"
+    case "public.heic": fileExt = "heic"
+    default: fileExt = "tiff"
+    }
+
+    let tempURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("maccy-preview-\(UUID().uuidString).\(fileExt)")
+
+    do {
+      try data.write(to: tempURL)
+      NSWorkspace.shared.open(tempURL)
+    } catch {
+      // Fallback: convert via NSImage to TIFF
+      guard let image = item.item.image,
+            let tiffData = image.tiffRepresentation else { return }
+      let tiffURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("maccy-preview-\(UUID().uuidString).tiff")
+      try? tiffData.write(to: tiffURL)
+      NSWorkspace.shared.open(tiffURL)
+    }
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       if item.hasImage {
@@ -22,6 +58,17 @@ struct PreviewItemView: View {
               Image(nsImage: image)
                 .resizable()
             }
+            .onTapGesture(count: 2) {
+              openInPreview()
+            }
+            .onHover { inside in
+              if inside {
+                NSCursor.pointingHand.push()
+              } else {
+                NSCursor.pop()
+              }
+            }
+            .help("Double-click to open in Preview")
           } else {
             previewImage {
               ZStack {
