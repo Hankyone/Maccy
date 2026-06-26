@@ -7,6 +7,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   static let isTesting = CommandLine.arguments.contains("enable-testing")
   var panel: FloatingPanel<ContentView>!
 
+  // Start Sparkle's updater at launch so it can check for updates
+  // and prompt the user. Without this, the updater only runs when
+  // the Settings window is opened, which means no automatic checks.
+  let updater = SoftwareUpdater()
+
   @objc
   private lazy var statusItem: NSStatusItem = {
     let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
