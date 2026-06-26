@@ -36,18 +36,25 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
   }
   var shortcuts: [KeyShortcut] = []
 
+  private var _application: String?
   var application: String? {
+    if let cached = _application {
+      return cached
+    }
     if item.universalClipboard {
-      return "iCloud"
+      _application = "iCloud"
+      return _application
     }
 
     guard let bundle = item.application,
       let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle)
     else {
+      _application = nil
       return nil
     }
 
-    return url.deletingPathExtension().lastPathComponent
+    _application = url.deletingPathExtension().lastPathComponent
+    return _application
   }
 
   var hasImage: Bool { item.image != nil }
@@ -59,7 +66,14 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
   var applicationImage: ApplicationImage
 
   // 10k characters seems to be more than enough on large displays
-  var text: String { item.previewableText.shortened(to: 10_000) }
+  private var _text: String?
+  var text: String {
+    if let cached = _text {
+      return cached
+    }
+    _text = item.previewableText.shortened(to: 10_000)
+    return _text!
+  }
 
   var isPinned: Bool { item.pin != nil }
   var isUnpinned: Bool { item.pin == nil }

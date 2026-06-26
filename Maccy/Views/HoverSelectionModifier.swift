@@ -4,9 +4,9 @@ private struct HoverSelectionModifier: ViewModifier {
   @Environment(AppState.self) private var appState
   var id: UUID
 
-  // Short debounce for normal hover — fast enough to feel responsive,
+  // Short debounce for normal hover — one frame at 60fps, imperceptible
   // but coalesces rapid hover events from scrolling into a single selection.
-  static let hoverDebounce: UInt64 = 50_000_000 // 50ms
+  static let hoverDebounce: UInt64 = 16_000_000 // 16ms
 
   // Longer delay when preview is open so the user can sweep the mouse
   // toward the preview without each intermediate item becoming selected.
