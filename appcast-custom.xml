@@ -5,5 +5,5 @@
     <link>https://raw.githubusercontent.com/Hankyone/Maccy/master/appcast-custom.xml</link>
     <description>Custom builds with Tahoe fixes.</description>
     <language>en</language>
-  <item><title>2.6.1</title><description>Custom build 2.6.1 (63) with Tahoe fixes.</description><pubDate>Fri, 26 Jun 2026 20:51:27 +0000</pubDate><sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion><enclosure url="https://github.com/Hankyone/Maccy/releases/download/v2.6.1-63-custom/Maccy.zip" sparkle:version="63" sparkle:shortVersionString="2.6.1" length="5089561" type="application/octet-stream" sparkle:edSignature="vd2Gmep/YHFidyDnbAj97FD9AHcefYnrCN75HWr+MaVcr3jlfO0vpdliIdpRyT4STDSWDgK2puWPvvp/6i44DQ==" /></item></channel>
+  <item><title>2.6.1</title><description>Custom build 2.6.1 (64) with Tahoe fixes.</description><pubDate>Fri, 26 Jun 2026 21:24:54 +0000</pubDate><sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion><enclosure url="https://github.com/Hankyone/Maccy/releases/download/v2.6.1-64-custom/Maccy.zip" sparkle:version="64" sparkle:shortVersionString="2.6.1" length="5104361" type="application/octet-stream" sparkle:edSignature="9ZM0lQfEXQRIPffJwtPgNEmtXDy9/YxKlaUzxuWllarxePZhtVg8TGiZvFGrqktIGdeI4usN6g6Ec9gBkGyjCw==" /></item></channel>
 </rss>
