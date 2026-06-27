@@ -99,6 +99,7 @@ struct PreviewItemView: View {
             }
           }
         }
+        .id(item.id)
       } else {
         let text = item.previewText
         if text.count >= Self.largeTextThreshold {
