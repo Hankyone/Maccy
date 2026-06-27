@@ -5,5 +5,5 @@
     <link>https://raw.githubusercontent.com/Hankyone/Maccy/master/appcast-custom.xml</link>
     <description>Custom builds with macOS 27 fixes.</description>
     <language>en</language>
-  <item><title>2.6.1</title><description>Custom build 2.6.1 (76) with macOS 27 fixes.</description><pubDate>Sat, 27 Jun 2026 18:52:08 +0000</pubDate><sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion><enclosure url="https://github.com/Hankyone/Maccy/releases/download/v2.6.1-76-custom/Maccy.zip" sparkle:version="76" sparkle:shortVersionString="2.6.1" length="5104657" type="application/octet-stream" sparkle:edSignature="hWwkzddQFu9cAipZ8CL0xvQgxXy7ObciLYs4AgOPNbZNtojYVVZeUDxZKxgPchZ4B0doK/tY6+QbI+KibNLPAQ==" /></item></channel>
+  <item><title>2.6.1</title><description>Custom build 2.6.1 (77) with macOS 27 fixes.</description><pubDate>Sat, 27 Jun 2026 19:00:51 +0000</pubDate><sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion><enclosure url="https://github.com/Hankyone/Maccy/releases/download/v2.6.1-77-custom/Maccy.zip" sparkle:version="77" sparkle:shortVersionString="2.6.1" length="5098069" type="application/octet-stream" sparkle:edSignature="lyAv0bI5Z1sXz+m5R7SiLzf5+Qe5Ks6w4zJwL+IOEGNrUbXErmSosK6yiaEnHZzRv5Ff36Kt2rS+hZW6E07yCg==" /></item></channel>
 </rss>
