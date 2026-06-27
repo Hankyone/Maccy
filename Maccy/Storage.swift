@@ -15,9 +15,19 @@ class Storage {
     return ByteCountFormatter().string(fromByteCount: size)
   }
 
-  private let url = URL.applicationSupportDirectory.appending(path: "Maccy/Storage.sqlite")
+  private let url: URL
 
   init() {
+    // URL.applicationSupportDirectory returns the container path on macOS 27,
+    // even without sandbox entitlements. Use getpwuid to get the real home
+    // directory so we can find the existing database at the standard path.
+    var realHome = NSHomeDirectory()
+    if let pw = getpwuid(getuid()) {
+      realHome = String(cString: pw.pointee.pw_dir)
+    }
+    url = URL(fileURLWithPath: realHome)
+      .appendingPathComponent("Library/Application Support/Maccy/Storage.sqlite")
+
     var config = ModelConfiguration(url: url)
 
     #if DEBUG
