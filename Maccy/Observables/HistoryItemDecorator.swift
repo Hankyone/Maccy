@@ -62,10 +62,14 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
   var previewImageGenerationTask: Task<(), Error>?
   var thumbnailImageGenerationTask: Task<(), Error>?
   var previewImage: NSImage?
+  var previewText: String {
+    item.previewableText
+  }
   var thumbnailImage: NSImage?
   var applicationImage: ApplicationImage
 
   // 10k characters seems to be more than enough on large displays
+<<<<<<< HEAD
   private var _text: String?
   var text: String {
     if let cached = _text {
@@ -74,6 +78,9 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
     _text = item.previewableText.shortened(to: 10_000)
     return _text!
   }
+=======
+  var text: String { previewText.shortened(to: 10_000) }
+>>>>>>> upstream/master
 
   var isPinned: Bool { item.pin != nil }
   var isUnpinned: Bool { item.pin == nil }
@@ -147,6 +154,7 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
     previewImage?.recache()
     thumbnailImage = nil
     previewImage = nil
+    item.clearDecodedImageCache()
   }
 
   @MainActor
