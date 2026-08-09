@@ -166,8 +166,11 @@ class History: ItemsContainer { // swiftlint:disable:this type_body_length
         item.application = existingHistoryItem.application
       }
       logger.info("Removing duplicate item '\(item.title)'")
-      Storage.shared.context.delete(existingHistoryItem)
       removedItemIndex = all.firstIndex(where: { $0.item == existingHistoryItem })
+      if let removedItemIndex {
+        cleanup(all[removedItemIndex])
+      }
+      Storage.shared.context.delete(existingHistoryItem)
       if let removedItemIndex {
         all.remove(at: removedItemIndex)
       }
@@ -186,9 +189,10 @@ class History: ItemsContainer { // swiftlint:disable:this type_body_length
     var itemDecorator: HistoryItemDecorator
     if let pin = item.pin {
       itemDecorator = HistoryItemDecorator(item, shortcuts: KeyShortcut.create(character: pin))
-      // Keep pins in the same place.
       if let removedItemIndex {
-        all.insert(itemDecorator, at: removedItemIndex)
+        // If pin to bottom -> last element should be inserted to the removedItemIndex - 1
+        // Or to the last all array place.
+        all.insert(itemDecorator, at: min(removedItemIndex, all.count))
       }
     } else {
       itemDecorator = HistoryItemDecorator(item)
@@ -300,19 +304,11 @@ class History: ItemsContainer { // swiftlint:disable:this type_body_length
     item.cleanupImages()
   }
 
-  private func currentModifierFlags() -> NSEvent.ModifierFlags {
-    return NSApp.currentEvent?.modifierFlags
-      .intersection(.deviceIndependentFlagsMask)
-      .subtracting([.capsLock, .numericPad, .function]) ?? []
-  }
-
   @MainActor
-  func select(_ item: HistoryItemDecorator?) {
+  func select(_ item: HistoryItemDecorator?, flags modifierFlags: NSEvent.ModifierFlags) {
     guard let item else {
       return
     }
-
-    let modifierFlags = currentModifierFlags()
 
     if modifierFlags.isEmpty {
       AppState.shared.popup.close()
@@ -344,12 +340,10 @@ class History: ItemsContainer { // swiftlint:disable:this type_body_length
   }
 
   @MainActor
-  func startPasteStack(selection: inout Selection<HistoryItemDecorator>) {
+  func startPasteStack(selection: inout Selection<HistoryItemDecorator>, flags modifierFlags: NSEvent.ModifierFlags) {
     guard AppState.shared.multiSelectionEnabled else { return }
     guard let item = selection.first else { return }
     PasteStack.initializeIfNeeded()
-
-    let modifierFlags = currentModifierFlags()
 
     let stack = PasteStack(items: selection.items, modifierFlags: modifierFlags)
     pasteStack = stack
@@ -455,17 +449,11 @@ class History: ItemsContainer { // swiftlint:disable:this type_body_length
 
   @MainActor
   private func findSimilarItem(_ item: HistoryItem) -> HistoryItem? {
-    let descriptor = FetchDescriptor<HistoryItem>()
-    if let all = try? Storage.shared.context.fetch(descriptor) {
-      let duplicates = all.filter({ $0 == item || $0.supersedes(item) })
-      if duplicates.count > 1 {
-        return duplicates.first(where: { $0 != item })
-      } else {
-        return isModified(item)
-      }
+    if let duplicate = all.first(where: { $0.item != item && $0.item.supersedes(item) }) {
+      return duplicate.item
     }
 
-    return item
+    return isModified(item)
   }
 
   private func isModified(_ item: HistoryItem) -> HistoryItem? {
