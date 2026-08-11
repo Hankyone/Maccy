@@ -1,0 +1,14 @@
+"quit_tooltip" = "បិទកម្មវិធី។";
+"search_placeholder" = "វាយអក្សរដើម្បីស្វែងរក…";
+"clear_all" = "សម្អាតទាំងអស់";
+"clear" = "សម្អាត";
+"clear_alert_confirm" = "សម្អាត";
+"quit" = "បិទ";
+"preferences" = "ការកំណត់ចំណូលចិត្ត…";
+"clear_alert_comment" = "អ្នកមិនអាចត្រឡប់វាវិញបានទេ។";
+"clear_tooltip" = "សម្អាតធាតុដែលមិនបានខ្ទាស់។\nជ្រើសដោយចុច ⇧ ដើម្បីសម្អាតទាំងអស់។";
+"about" = "អំពី";
+"about_tooltip" = "អានបន្ថែមអំពីកម្មវិធី។";
+"clear_alert_message" = "តើអ្នកប្រាកដថាចង់សម្អាតប្រវត្តិមែនទេ?";
+"clear_alert_cancel" = "បោះបង់";
+"clear_all_tooltip" = "សម្អាតធាតុទាំងអស់។";
