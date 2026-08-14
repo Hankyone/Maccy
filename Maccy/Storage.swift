@@ -21,7 +21,7 @@ class Storage {
     var config = ModelConfiguration(url: url)
 
     #if DEBUG
-    if CommandLine.arguments.contains("enable-testing") {
+    if AppDelegate.isTesting {
       config = ModelConfiguration(isStoredInMemoryOnly: true)
     }
     #endif
@@ -31,5 +31,24 @@ class Storage {
     } catch let error {
       fatalError("Cannot load database: \(error.localizedDescription).")
     }
+  }
+
+  func cleanupOrphanedContents() throws -> Int {
+    let descriptor = FetchDescriptor<HistoryItemContent>(
+      predicate: #Predicate { $0.item == nil }
+    )
+    let count = try context.fetchCount(descriptor)
+    guard count > 0 else {
+      return 0
+    }
+
+    try context.delete(
+      model: HistoryItemContent.self,
+      where: #Predicate { $0.item == nil }
+    )
+    context.processPendingChanges()
+    try context.save()
+
+    return count
   }
 }
