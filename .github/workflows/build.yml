@@ -18,10 +18,14 @@ jobs:
 
       - name: Select Xcode
         run: |
-          # Prefer the latest Xcode available (26.x for macOS 26+ APIs)
-          LATEST=$(ls -d /Applications/Xcode_*.app /Applications/Xcode.app 2>/dev/null | sort -V | tail -1)
-          echo "Selecting $LATEST"
-          sudo xcode-select -s "$LATEST/Contents/Developer"
+          # Xcode 26.3's actool fails to compile Icon Composer .icon files.
+          # Pin to the latest stable 26.x below 26.3 that still supports them.
+          XCODE=$(ls -d /Applications/Xcode_26.2*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE" ]; then
+            XCODE=$(ls -d /Applications/Xcode_*.app /Applications/Xcode.app 2>/dev/null | sort -V | tail -1)
+          fi
+          echo "Selecting $XCODE"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
 
       - name: Import signing certificate
@@ -67,6 +71,12 @@ jobs:
             CODE_SIGNING_ALLOWED=YES \
             -destination 'generic/platform=macOS' \
             2>&1 | tee build.log | tail -50
+          status=${PIPESTATUS[0]}
+          if [ $status -ne 0 ]; then
+            echo "=== Full build log (errors) ==="
+            grep -n "error:\|failed\|FAILED" build.log | head -50
+            exit $status
+          fi
 
       - name: Re-sign bundle (inside-out, Developer ID)
         run: |
