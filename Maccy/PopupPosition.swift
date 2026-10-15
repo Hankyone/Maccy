@@ -58,8 +58,15 @@ enum PopupPosition: String, CaseIterable, Identifiable, CustomStringConvertible,
     }
 
     let mouseLocation = NSEvent.mouseLocation
-    let point = NSPoint(x: mouseLocation.x, y: mouseLocation.y - size.height)
+    var point = NSPoint(x: mouseLocation.x, y: mouseLocation.y - size.height)
     let screen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
+
+    // If there isn't enough room below the cursor, open upward from the
+    // cursor instead of clamping to the bottom edge far from the mouse.
+    if let frame = screen?.visibleFrame, point.y < frame.minY {
+      point.y = mouseLocation.y
+    }
+
     return constrained(point, ofSize: size, to: screen)
   }
 
