@@ -16,6 +16,12 @@ class NavigationManager { // swiftlint:disable:this type_body_length
       selection.forEach { _, item in item.selectionIndex = -1 }
       newValue.forEach { index, item in item.selectionIndex = index }
     }
+    didSet {
+      let inProgress = isManualMultiSelect || selection.count > 1
+      if inProgress != isMultiSelectInProgress {
+        isMultiSelectInProgress = inProgress
+      }
+    }
   }
 
   var scrollTarget: UUID?
@@ -62,15 +68,20 @@ class NavigationManager { // swiftlint:disable:this type_body_length
     return leadSelection != nil && leadSelection == history.pasteStack?.id
   }
 
-  var isManualMultiSelect: Bool = false
-  var isMultiSelectInProgress: Bool {
-    return isManualMultiSelect || selection.count > 1
+  var isManualMultiSelect: Bool = false {
+    didSet {
+      let inProgress = isManualMultiSelect || selection.count > 1
+      if inProgress != isMultiSelectInProgress {
+        isMultiSelectInProgress = inProgress
+      }
+    }
   }
   var isDragAndDropInProgress: Bool = false {
     didSet {
       updateSelectionState()
     }
   }
+  private(set) var isMultiSelectInProgress: Bool = false
 
   var hoverSelectionWhileKeyboardNavigating: UUID?
   var isKeyboardNavigating: Bool = true {
