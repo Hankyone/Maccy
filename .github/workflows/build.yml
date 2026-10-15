@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
 
     steps:
       - name: Checkout
@@ -18,12 +18,10 @@ jobs:
 
       - name: Select Xcode
         run: |
-          # Xcode 26.3's actool fails to compile Icon Composer .icon files.
-          # Pin to the latest stable 26.x below 26.3 that still supports them.
-          XCODE=$(ls -d /Applications/Xcode_26.2*.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$XCODE" ]; then
-            XCODE=$(ls -d /Applications/Xcode_*.app /Applications/Xcode.app 2>/dev/null | sort -V | tail -1)
-          fi
+          # Upstream needs a recent Swift toolchain, so use the newest stable Xcode.
+          # The Icon Composer .icon is excluded from Release builds, so newer actool is fine.
+          ls -d /Applications/Xcode_*.app
+          XCODE=$(ls -d /Applications/Xcode_*.app | grep -iv beta | sort -V | tail -1)
           echo "Selecting $XCODE"
           sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
