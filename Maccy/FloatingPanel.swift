@@ -63,6 +63,10 @@ class FloatingPanel<Content: View>: NSPanel, NSWindowDelegate {
     applyRoundedCorners()
   }
 
+  // Xcode 26 (Swift 6.3) crashes inlining into the implicit deinit in Release builds.
+  @_optimize(none)
+  deinit {}
+
   private func applyRoundedCorners() {
     let radius = Popup.cornerRadius + Popup.horizontalPadding
 
