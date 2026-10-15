@@ -1,0 +1,256 @@
+name: Build Maccy
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          # Xcode 26.3's actool fails to compile Icon Composer .icon files.
+          # Pin to the latest stable 26.x below 26.3 that still supports them.
+          XCODE=$(ls -d /Applications/Xcode_26.2*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE" ]; then
+            XCODE=$(ls -d /Applications/Xcode_*.app /Applications/Xcode.app 2>/dev/null | sort -V | tail -1)
+          fi
+          echo "Selecting $XCODE"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Import signing certificate
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_P12_PASSWORD }}
+        run: |
+          # Create a temporary keychain
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD=$(uuidgen)
+
+          # Decode the p12
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          echo "$MACOS_CERTIFICATE_P12" | base64 --decode > "$CERT_PATH"
+
+          # Create and unlock keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          security import "$CERT_PATH" -P "$MACOS_CERTIFICATE_P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Add to search list
+          security list-keychains -s "$KEYCHAIN_PATH" login.keychain-db
+
+          # Verify
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Maccy.xcodeproj \
+            -scheme Maccy \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="Developer ID Application: Anouar Mansour (K32684A887)" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="K32684A887" \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGNING_ALLOWED=YES \
+            -destination 'generic/platform=macOS' \
+            2>&1 | tee build.log | tail -50
+          status=${PIPESTATUS[0]}
+          if [ $status -ne 0 ]; then
+            echo "=== Full build log (errors) ==="
+            grep -n "error:\|failed\|FAILED" build.log | head -50
+            exit $status
+          fi
+
+      - name: Re-sign bundle (inside-out, Developer ID)
+        run: |
+          APP="build/Build/Products/Release/Maccy.app"
+          IDENTITY="Developer ID Application: Anouar Mansour (K32684A887)"
+
+          # Re-sign XPC services inside Sparkle (inside-out)
+          for xpc in "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices"/*.xpc; do
+            codesign --force -s "$IDENTITY" --options runtime "$xpc"
+          done
+          codesign --force -s "$IDENTITY" --options runtime "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app"
+          codesign --force -s "$IDENTITY" --options runtime "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"
+          codesign --force -s "$IDENTITY" --options runtime "$APP/Contents/Frameworks/Sparkle.framework"
+
+          # Re-sign app with sandbox entitlements + hardened runtime
+          codesign --force -s "$IDENTITY" --options runtime --entitlements Maccy/Maccy.entitlements "$APP"
+          codesign --verify --deep --strict "$APP" && echo "Signature OK"
+
+      - name: Read version info
+        id: version
+        run: |
+          APP="build/Build/Products/Release/Maccy.app"
+          SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Contents/Info.plist")
+          echo "short=$SHORT" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version $SHORT ($VERSION)"
+
+      - name: Create ZIP
+        run: |
+          cd build/Build/Products/Release
+          ditto -c -k --keepParent Maccy.app Maccy.zip
+
+      - name: Notarize
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          ZIP_PATH="build/Build/Products/Release/Maccy.zip"
+
+          echo "Submitting for notarization..."
+          xcrun notarytool submit "$ZIP_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+          echo "Stapling ticket..."
+          xcrun stapler staple "build/Build/Products/Release/Maccy.app"
+          xcrun stapler validate "build/Build/Products/Release/Maccy.app"
+
+          # Re-zip the stapled app
+          cd build/Build/Products/Release
+          rm Maccy.zip
+          ditto -c -k --keepParent Maccy.app Maccy.zip
+
+      - name: Sign update with Sparkle EdDSA
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          cat > /tmp/sign_update.swift << 'SWIFT'
+          import Foundation
+          import CryptoKit
+
+          let args = CommandLine.arguments
+          guard args.count >= 3 else {
+              FileHandle.standardError.write("Usage: sign_update <zipPath> <privateKeyBase64>\n".data(using: .utf8)!)
+              exit(1)
+          }
+          let zipPath = args[1]
+          let privateKeyBase64 = args[2]
+
+          guard let privateKeyData = Data(base64Encoded: privateKeyBase64) else {
+              FileHandle.standardError.write("Invalid private key base64\n".data(using: .utf8)!)
+              exit(1)
+          }
+
+          let zipData = try! Data(contentsOf: URL(fileURLWithPath: zipPath))
+          let privateKey = try! Curve25519.Signing.PrivateKey(rawRepresentation: privateKeyData)
+          let signature = try! privateKey.signature(for: zipData)
+          print(signature.base64EncodedString())
+          SWIFT
+
+          SIGNATURE=$(swift /tmp/sign_update.swift \
+            build/Build/Products/Release/Maccy.zip \
+            "$SPARKLE_PRIVATE_KEY")
+          echo "SPARKLE_SIGNATURE=$SIGNATURE" >> "$GITHUB_ENV"
+          echo "Update signature: $SIGNATURE"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Maccy-app
+          path: build/Build/Products/Release/Maccy.zip
+          retention-days: 90
+
+      - name: Create release and update appcast
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SPARKLE_SIGNATURE: ${{ env.SPARKLE_SIGNATURE }}
+          SHORT: ${{ steps.version.outputs.short }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          ZIP_PATH="build/Build/Products/Release/Maccy.zip"
+          ZIP_SIZE=$(stat -f%z "$ZIP_PATH")
+          DOWNLOAD_URL="https://github.com/Hankyone/Maccy/releases/download/${TAG}/Maccy.zip"
+          PUB_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S +0000")
+
+          # Create GitHub release with the zip
+          gh release create "$TAG" \
+            "$ZIP_PATH" \
+            --title "Maccy $SHORT" \
+            --notes "Custom build with macOS 27 fixes (version $SHORT, build $VERSION).
+
+          Signed with Developer ID and notarized by Apple.
+
+          Updates are signed with EdDSA and verified by Sparkle automatically."
+
+          # Update appcast-custom.xml with the new entry
+          python3 << PYTHON
+          import xml.etree.ElementTree as ET
+
+          short = "$SHORT"
+          version = "$VERSION"
+          download_url = "$DOWNLOAD_URL"
+          zip_size = "$ZIP_SIZE"
+          signature = "$SPARKLE_SIGNATURE"
+          pub_date = "$PUB_DATE"
+
+          ET.register_namespace('sparkle', 'http://www.andymatuschak.org/xml-namespaces/sparkle')
+          ET.register_namespace('dc', 'http://purl.org/dc/elements/1.1/')
+
+          tree = ET.parse('appcast-custom.xml')
+          channel = tree.find('channel')
+
+          # Remove existing item with same version if present
+          for item in channel.findall('item'):
+              t = item.find('title')
+              if t is not None and t.text == short:
+                  channel.remove(item)
+
+          item = ET.SubElement(channel, 'item')
+          ET.SubElement(item, 'title').text = short
+          ET.SubElement(item, 'description').text = f'Custom build {short} ({version}) with macOS 27 fixes.'
+          ET.SubElement(item, 'pubDate').text = pub_date
+          ET.SubElement(item, '{http://www.andymatuschak.org/xml-namespaces/sparkle}minimumSystemVersion').text = '14.0'
+
+          enc = ET.SubElement(item, 'enclosure')
+          enc.set('url', download_url)
+          enc.set('{http://www.andymatuschak.org/xml-namespaces/sparkle}version', version)
+          enc.set('{http://www.andymatuschak.org/xml-namespaces/sparkle}shortVersionString', short)
+          enc.set('length', zip_size)
+          enc.set('type', 'application/octet-stream')
+          enc.set('{http://www.andymatuschak.org/xml-namespaces/sparkle}edSignature', signature)
+
+          tree.write('appcast-custom.xml', encoding='utf-8', xml_declaration=True)
+          PYTHON
+
+          # Commit and push updated appcast-custom.xml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add appcast-custom.xml
+          git commit -m "Update appcast for $TAG ($SHORT)"
+          git push origin HEAD:master
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          if [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+          fi
