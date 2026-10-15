@@ -15,7 +15,7 @@ struct GeneralSettingsPane: View {
   @State private var pasteModifier = HistoryItemAction.paste.modifierFlags.description
   @State private var pasteWithoutFormatting = HistoryItemAction.pasteWithoutFormatting.modifierFlags.description
 
-  @State private var updater = SoftwareUpdater()
+  @State private var updater = AppState.shared.appDelegate?.updater ?? SoftwareUpdater()
 
   var body: some View {
     Settings.Container(contentWidth: 450) {
