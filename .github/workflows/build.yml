@@ -57,7 +57,14 @@ jobs:
       - name: Build
         run: |
           set -o pipefail
+          # The fork's build number comes from the release tag (v2.8.0-80-custom -> 80),
+          # so upstream's CURRENT_PROJECT_VERSION stays untouched and never conflicts.
+          BUILD_ARGS=()
+          if [[ "$GITHUB_REF" =~ ^refs/tags/v.*-([0-9]+)-custom$ ]]; then
+            BUILD_ARGS+=("CURRENT_PROJECT_VERSION=${BASH_REMATCH[1]}")
+          fi
           xcodebuild \
+            "${BUILD_ARGS[@]}" \
             -project Maccy.xcodeproj \
             -scheme Maccy \
             -configuration Release \
