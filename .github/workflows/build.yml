@@ -205,6 +205,11 @@ jobs:
 
           Updates are signed with EdDSA and verified by Sparkle automatically."
 
+          # Update appcast-custom.xml on the latest master, which may have moved
+          # past the tag since the build started.
+          git fetch origin master
+          git checkout -q origin/master
+
           # Update appcast-custom.xml with the new entry
           python3 << PYTHON
           import xml.etree.ElementTree as ET
