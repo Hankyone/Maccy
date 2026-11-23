@@ -79,4 +79,5 @@ jobs:
 
           # Tags pushed with GITHUB_TOKEN don't trigger workflows, so start the
           # build (sign, notarize, release, update appcast-custom.xml) directly.
-          gh workflow run build.yml --ref "$TAG"
+          # --repo is needed because gh would otherwise target the "upstream" remote.
+          gh workflow run build.yml --ref "$TAG" --repo "$GITHUB_REPOSITORY"
