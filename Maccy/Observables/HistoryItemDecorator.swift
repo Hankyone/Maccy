@@ -139,33 +139,63 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
 
   @MainActor
   func ensureThumbnailImage() {
-    guard item.image != nil else {
+    guard thumbnailImage == nil, thumbnailImageGenerationTask == nil else {
       return
     }
-    guard thumbnailImage == nil else {
-      return
-    }
-    guard thumbnailImageGenerationTask == nil else {
-      return
-    }
-    thumbnailImageGenerationTask = Task { [weak self] in
-      self?.generateThumbnailImage()
-    }
+    thumbnailImageGenerationTask = loadImage(
+      fitting: HistoryItemDecorator.thumbnailImageSize,
+      reserveSpace: true,
+      fallback: { [weak self] in self?.generateThumbnailImage() },
+      assign: { [weak self] in self?.thumbnailImage = $0 }
+    )
   }
 
   @MainActor
   func ensurePreviewImage() {
-    guard item.image != nil else {
+    guard previewImage == nil, previewImageGenerationTask == nil else {
       return
     }
-    guard previewImage == nil else {
-      return
+    previewImageGenerationTask = loadImage(
+      fitting: HistoryItemDecorator.previewImageSize,
+      reserveSpace: false,
+      fallback: { [weak self] in self?.generatePreviewImage() },
+      assign: { [weak self] in self?.previewImage = $0 }
+    )
+  }
+
+  // Decodes the image at its display size on a background thread, so long
+  // histories of screenshots scroll without stalls. When `reserveSpace` is set,
+  // an empty image of the final size holds the row height until it's ready.
+  @MainActor
+  private func loadImage(
+    fitting bounds: NSSize,
+    reserveSpace: Bool,
+    fallback: @escaping @MainActor () -> Void,
+    assign: @escaping @MainActor (NSImage) -> Void
+  ) -> Task<(), Error>? {
+    guard let data = item.imageData else {
+      return nil
     }
-    guard previewImageGenerationTask == nil else {
-      return
+    guard let size = ImageDownsampler.fittedSize(of: data, in: bounds) else {
+      // Image I/O can't read it; let AppKit try.
+      return Task { fallback() }
     }
-    previewImageGenerationTask = Task { [weak self] in
-      self?.generatePreviewImage()
+
+    if reserveSpace {
+      assign(NSImage(size: size))
+    }
+
+    let scale = NSScreen.forPopup?.backingScaleFactor ?? 2
+    return Task {
+      let image = await Task.detached(priority: .userInitiated) {
+        ImageDownsampler.image(from: data, pointSize: size, backingScale: scale)
+      }.value
+      try Task.checkCancellation()
+      if let image {
+        assign(image)
+      } else {
+        fallback()
+      }
     }
   }
 
@@ -183,6 +213,8 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
   func cleanupImages() {
     thumbnailImageGenerationTask?.cancel()
     previewImageGenerationTask?.cancel()
+    thumbnailImageGenerationTask = nil
+    previewImageGenerationTask = nil
     thumbnailImage?.recache()
     previewImage?.recache()
     thumbnailImage = nil
