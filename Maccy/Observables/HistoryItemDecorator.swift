@@ -71,6 +71,19 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
     ByteCountFormatter.string(fromByteCount: Int64($0.count), countStyle: .file)
   }
 
+  // Full text for search, cached because reading it from storage is slow.
+  // Capped so a huge clip can't slow down typing.
+  @ObservationIgnored
+  private var cachedSearchableText: String?
+  var searchableText: String {
+    if let cachedSearchableText {
+      return cachedSearchableText
+    }
+    let text = String(item.previewableText.prefix(200_000))
+    cachedSearchableText = text
+    return text
+  }
+
   // 10k characters seems to be more than enough on large displays
   var text: String { previewText.string.shortened(to: 10_000) }
 
@@ -244,8 +257,18 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
     generateThumbnailImage()
   }
 
-  func highlight(_ query: String, _ ranges: [Range<String.Index>]) {
-    guard !query.isEmpty, !title.isEmpty else {
+  func highlight(_ query: String, _ ranges: [Range<String.Index>], textRanges: [Range<String.Index>] = []) {
+    guard !query.isEmpty else {
+      attributedTitle = nil
+      return
+    }
+
+    if ranges.isEmpty, !textRanges.isEmpty {
+      attributedTitle = snippet(around: textRanges)
+      return
+    }
+
+    guard !title.isEmpty else {
       attributedTitle = nil
       return
     }
@@ -254,21 +277,64 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
     for range in ranges {
       if let lowerBound = AttributedString.Index(range.lowerBound, within: attributedString),
          let upperBound = AttributedString.Index(range.upperBound, within: attributedString) {
-        switch Defaults[.highlightMatch] {
-        case .bold:
-          attributedString[lowerBound..<upperBound].font = .bold(.body)()
-        case .italic:
-          attributedString[lowerBound..<upperBound].font = .italic(.body)()
-        case .underline:
-          attributedString[lowerBound..<upperBound].underlineStyle = .single
-        default:
-          attributedString[lowerBound..<upperBound].backgroundColor = .findHighlightColor
-          attributedString[lowerBound..<upperBound].foregroundColor = .black
-        }
+        Self.applyHighlight(to: &attributedString[lowerBound..<upperBound])
       }
     }
 
     attributedTitle = attributedString
+  }
+
+  private static func applyHighlight(to text: inout AttributedSubstring) {
+    switch Defaults[.highlightMatch] {
+    case .bold:
+      text.font = .bold(.body)()
+    case .italic:
+      text.font = .italic(.body)()
+    case .underline:
+      text.underlineStyle = .single
+    default:
+      text.backgroundColor = .findHighlightColor
+      text.foregroundColor = .black
+    }
+  }
+
+  // A one-line excerpt of the full text starting just before the first match,
+  // shown in place of the title when the match is past what the title shows.
+  private func snippet(around ranges: [Range<String.Index>]) -> AttributedString {
+    let text = searchableText
+    let sorted = ranges.sorted { $0.lowerBound < $1.lowerBound }
+    guard let first = sorted.first else {
+      return AttributedString(title)
+    }
+
+    let start = text.index(first.lowerBound, offsetBy: -40, limitedBy: text.startIndex) ?? text.startIndex
+    let end = text.index(start, offsetBy: 300, limitedBy: text.endIndex) ?? text.endIndex
+    let newline = Defaults[.showSpecialSymbols] ? "⏎" : " "
+    func plain(_ part: Substring) -> AttributedString {
+      AttributedString(
+        part
+          .replacingOccurrences(of: "\r\n", with: newline)
+          .replacingOccurrences(of: "\n", with: newline)
+          .replacingOccurrences(of: "\t", with: " ")
+          .removingScalarsUnsafeForTitleLayout()
+      )
+    }
+
+    var result = AttributedString(start > text.startIndex ? "…" : "")
+    var cursor = start
+    for range in sorted where range.lowerBound >= cursor && range.upperBound <= end {
+      result += plain(text[cursor..<range.lowerBound])
+      var match = plain(text[range])
+      Self.applyHighlight(to: &match[match.startIndex..<match.endIndex])
+      result += match
+      cursor = range.upperBound
+    }
+    result += plain(text[cursor..<end])
+    if end < text.endIndex {
+      result += AttributedString("…")
+    }
+
+    return result
   }
 
   private func synchronizeItemPin() {
@@ -300,6 +366,7 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
   }
 
   private func synchronizeItemText() {
+    cachedSearchableText = nil
     previewText = withObservationTracking {
       SizedString(item.previewableText, maxParagraphBytes: Self.previewMaxParagraphSize)
     } onChange: { [weak self] in

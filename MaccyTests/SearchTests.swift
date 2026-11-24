@@ -225,6 +225,38 @@ extension SharedStateTests {
       #expect(search("m") == [])
     }
 
+    @Test("Simple search matches every word in any order")
+    func simpleSearchMultipleWords() {
+      Defaults[.searchMode] = Search.Mode.exact
+      #expect(search("baz foo") == [
+        Search.SearchResult(
+          score: nil,
+          object: items[0],
+          ranges: [range(from: 8, to: 10, in: items[0]), range(from: 0, to: 2, in: items[0])]
+        )
+      ])
+      #expect(search("foo zzz") == [])
+    }
+
+    @Test("Simple search finds text past the title")
+    func simpleSearchFullText() {
+      Defaults[.searchMode] = Search.Mode.exact
+      let longItem = HistoryItemDecorator(
+        Self.historyItemWithTitle(String(repeating: "a", count: 1_200) + " needle")
+      )
+      let results = Search().search(string: "needle", within: items + [longItem])
+      #expect(results.count == 1)
+      #expect(results.first?.object == longItem)
+      #expect(results.first?.ranges == [])
+      #expect(results.first?.textRanges.isEmpty == false)
+
+      longItem.highlight("needle", [], textRanges: results.first?.textRanges ?? [])
+      let attributedTitle = try? #require(longItem.attributedTitle)
+      let snippet = attributedTitle.map { String($0.characters) } ?? ""
+      #expect(snippet.hasPrefix("…"))
+      #expect(snippet.hasSuffix("needle"))
+    }
+
     private func search(_ string: String) -> [Search.SearchResult] {
       return Search().search(string: string, within: items)
     }

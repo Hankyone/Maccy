@@ -536,7 +536,7 @@ class History: ItemsContainer { // swiftlint:disable:this type_body_length
   private func filteredItems(from results: [Search.SearchResult]) -> [HistoryItemDecorator] {
     results.map { result in
       let item = result.object
-      item.highlight(searchQuery, result.ranges)
+      item.highlight(searchQuery, result.ranges, textRanges: result.textRanges)
 
       return item
     }

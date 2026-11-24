@@ -29,6 +29,8 @@ class Search {
     var score: Double?
     var object: Searchable
     var ranges: [Range<String.Index>] = []
+    // Matches in the item's full text, set when the title itself didn't match.
+    var textRanges: [Range<String.Index>] = []
   }
 
   typealias Searchable = HistoryItemDecorator
@@ -91,25 +93,47 @@ class Search {
     }
   }
 
+  // Matches every word of the query, in any order, first in titles and then
+  // anywhere in the full text. Title matches are listed first.
   private func simpleSearch(
     string: String,
     within: [Searchable],
     options: NSString.CompareOptions
   ) -> [SearchResult] {
-    return within.compactMap { simpleSearch(for: string, in: $0.title, of: $0, options: options) }
+    var terms = [string]
+    if !options.contains(.regularExpression) {
+      let words = string.split(whereSeparator: \.isWhitespace).map(String.init)
+      if !words.isEmpty {
+        terms = words
+      }
+    }
+
+    var titleMatches: [SearchResult] = []
+    var textMatches: [SearchResult] = []
+    for item in within {
+      if let ranges = ranges(of: terms, in: item.title, options: options) {
+        titleMatches.append(SearchResult(object: item, ranges: ranges))
+      } else if let ranges = ranges(of: terms, in: item.searchableText, options: options) {
+        textMatches.append(SearchResult(object: item, textRanges: ranges))
+      }
+    }
+
+    return titleMatches + textMatches
   }
 
-  private func simpleSearch(
-    for string: String,
+  private func ranges(
+    of terms: [String],
     in searchString: String,
-    of item: Searchable,
     options: NSString.CompareOptions
-  ) -> SearchResult? {
-    if let range = searchString.range(of: string, options: options, range: nil, locale: nil) {
-      return SearchResult(object: item, ranges: [range])
-    } else {
-      return nil
+  ) -> [Range<String.Index>]? {
+    var ranges: [Range<String.Index>] = []
+    for term in terms {
+      guard let range = searchString.range(of: term, options: options, range: nil, locale: nil) else {
+        return nil
+      }
+      ranges.append(range)
     }
+    return ranges
   }
 
   private func mixedSearch(string: String, within: [Searchable]) -> [SearchResult] {
