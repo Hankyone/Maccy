@@ -68,5 +68,42 @@ struct HistoryItemView: View {
     .accessibilityAction(named: Text("history_item_delete_action")) {
       appState.history.delete(item)
     }
+    .contextMenu { contextMenu }
+  }
+
+  @ViewBuilder
+  private var contextMenu: some View {
+    let selected = appState.navigator.selection.items
+    if appState.navigator.isMultiSelectInProgress, selected.count > 1, selected.contains(item) {
+      Button("Paste \(selected.count) Clips Together") {
+        ClipActions.combine(selected, flags: HistoryItemAction.paste.modifierFlags)
+      }
+      Button("Copy \(selected.count) Clips Together") {
+        ClipActions.combine(selected, flags: HistoryItemAction.copy.modifierFlags)
+      }
+      Divider()
+    }
+    Button("Paste") {
+      appState.history.select(item, flags: HistoryItemAction.paste.modifierFlags)
+    }
+    Button("Copy") {
+      appState.history.select(item, flags: HistoryItemAction.copy.modifierFlags)
+    }
+    if ClipActions.canPasteAsFilePath(item) || ClipActions.recognizedText(item) != nil
+        || ClipActions.tidyJSON(item) != nil {
+      Divider()
+    }
+    if ClipActions.canPasteAsFilePath(item) {
+      Button("Paste as File Path") { ClipActions.pasteAsFilePath(item) }
+    }
+    if let text = ClipActions.recognizedText(item) {
+      Button("Paste Recognized Text") { ClipActions.paste(text) }
+    }
+    if let json = ClipActions.tidyJSON(item) {
+      Button("Paste as Tidy JSON") { ClipActions.paste(json) }
+    }
+    Divider()
+    Button(item.isPinned ? "Unpin" : "Pin") { appState.history.togglePin(item) }
+    Button("Delete", role: .destructive) { appState.history.delete(item) }
   }
 }

@@ -8,7 +8,7 @@ import SwiftUI
 class AppState: Sendable {
   static let shared = AppState(history: History.shared, footer: Footer())
 
-  let multiSelectionEnabled = false
+  let multiSelectionEnabled = true
 
   var appDelegate: AppDelegate?
   var popup: Popup
@@ -61,7 +61,8 @@ class AppState: Sendable {
     if !navigator.selection.isEmpty {
       if navigator.isMultiSelectInProgress {
         navigator.isManualMultiSelect = false
-        history.startPasteStack(selection: &navigator.selection, flags: modifierFlags)
+        // Fork: paste the selected clips as one block instead of a paste stack.
+        ClipActions.combine(navigator.selection.items, flags: modifierFlags)
       } else {
         history.select(navigator.selection.first, flags: modifierFlags)
       }

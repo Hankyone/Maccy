@@ -34,6 +34,26 @@ private let objectReplacementTitleCases: [(input: String, title: String)] = [
 extension SharedStateTests {
   @MainActor
   struct HistoryItemTests {
+    @Test("Tidy JSON keeps key order and string contents")
+    func tidyJSON() {
+      let input = #"{"b":1,"a":[1, 2,{}],"s":"x, {y}: \"z\"","e":[]}"#
+      let expected = """
+      {
+        "b": 1,
+        "a": [
+          1,
+          2,
+          {}
+        ],
+        "s": "x, {y}: \\"z\\"",
+        "e": []
+      }
+      """
+      #expect(ClipActions.prettyJSON(input) == expected)
+      #expect(ClipActions.prettyJSON("not json") == nil)
+      #expect(ClipActions.prettyJSON("{broken") == nil)
+    }
+
     @Test("Sorted pins place letters before symbols")
     func sortedPinsPlacesLettersBeforeSymbols() {
       #expect(
