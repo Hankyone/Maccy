@@ -70,6 +70,14 @@ class Storage {
     return unwanted.count
   }
 
+  // SwiftData keeps a log of every change it makes, which Maccy never reads.
+  // Left alone it grows without limit (tens of MB after a year), so clear it.
+  func purgeChangeHistory() {
+    guard #available(macOS 15, *) else { return }
+
+    try? context.deleteHistory(HistoryDescriptor<DefaultHistoryTransaction>())
+  }
+
   // Titles stored before the sanitization in `HistoryItem.generateTitle()` may
   // contain scalars that hang CoreText on macOS 26. Such an item makes Maccy
   // spin at 100% CPU on every launch without ever drawing its window, so the

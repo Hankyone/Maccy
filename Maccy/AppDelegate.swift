@@ -113,6 +113,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
   func applicationDidFinishLaunching(_ aNotification: Notification) {
     migrateUserDefaults()
+    Storage.shared.purgeChangeHistory()
     disableUnusedGlobalHotkeys()
 
     panel = FloatingPanel(
