@@ -22,7 +22,7 @@ struct Select: AppIntent, CustomIntentMigratedAppIntent {
     let value = try await MainActor.run { () -> String in
       let items = AppState.shared.history.items
       let index = number - positionOffset
-      guard items.count >= index else {
+      guard items.indices.contains(index) else {
         throw AppIntentError.notFound
       }
 

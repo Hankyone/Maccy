@@ -1,5 +1,7 @@
 import Foundation
 import AppIntents
+import ImageIO
+import UniformTypeIdentifiers
 
 private nonisolated struct ItemContents: Sendable {
   let text: String?
@@ -46,7 +48,7 @@ struct Get: AppIntent, CustomIntentMigratedAppIntent {
         item = AppState.shared.navigator.selection.first?.item
       } else {
         let index = number - positionOffset
-        if AppState.shared.history.items.count >= index {
+        if AppState.shared.history.items.indices.contains(index) {
           item = AppState.shared.history.items[index].item
         }
       }
@@ -76,8 +78,13 @@ struct Get: AppIntent, CustomIntentMigratedAppIntent {
     }
 
     if let imageData = contents.image {
-      let file = URL.documentsDirectory.appending(path: "image.png")
-      try imageData.write(to: file, options: [.atomic, .completeFileProtection])
+      // Use a unique file with the image's real type so results don't overwrite each other.
+      let type = CGImageSourceCreateWithData(imageData as CFData, nil)
+        .flatMap { CGImageSourceGetType($0) as String? }
+        .flatMap { UTType($0) }
+      let ext = type?.preferredFilenameExtension ?? "png"
+      let file = URL.temporaryDirectory.appending(path: "Maccy-\(UUID().uuidString).\(ext)")
+      try imageData.write(to: file, options: [.atomic])
       intentItem.image = file
     }
 

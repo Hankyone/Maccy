@@ -19,6 +19,10 @@ struct IgnoreRegexpsSettingsView: View {
               edit = $0
             })
           ).onSubmit {
+            guard (try? NSRegularExpression(pattern: edit)) != nil else {
+              NSSound.beep()
+              return
+            }
             remove(regexp)
             ignoredRegexps.append(edit)
           }.focused($focus, equals: regexp)

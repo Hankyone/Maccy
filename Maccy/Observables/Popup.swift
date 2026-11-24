@@ -75,9 +75,12 @@ class Popup {
     guard let eventsMonitor else { return }
 
     NSEvent.removeMonitor(eventsMonitor)
+    self.eventsMonitor = nil
   }
 
   func open(height: CGFloat, at popupPosition: PopupPosition = Defaults[.popupPosition]) {
+    // The clipboard is polled, so pick up a copy made just before opening.
+    Clipboard.shared.checkForChangesInPasteboard()
     AppState.shared.appDelegate?.panel.open(height: height, at: popupPosition)
   }
 

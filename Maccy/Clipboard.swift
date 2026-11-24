@@ -256,16 +256,13 @@ class Clipboard {
   }
 
   private func shouldIgnore(_ item: NSPasteboardItem) -> Bool {
+    guard let string = item.string(forType: .string) else { return false }
+
     for regexp in Defaults[.ignoreRegexp] {
-      if let string = item.string(forType: .string) {
-        do {
-          let regex = try NSRegularExpression(pattern: regexp)
-          if regex.numberOfMatches(in: string, range: NSRange(string.startIndex..., in: string)) > 0 {
-            return true
-          }
-        } catch {
-          return false
-        }
+      // Skip an invalid pattern instead of giving up on the remaining ones.
+      guard let regex = try? NSRegularExpression(pattern: regexp) else { continue }
+      if regex.numberOfMatches(in: string, range: NSRange(string.startIndex..., in: string)) > 0 {
+        return true
       }
     }
     return false

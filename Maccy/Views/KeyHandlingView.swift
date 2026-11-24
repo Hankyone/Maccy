@@ -164,9 +164,11 @@ struct KeyHandlingView<Content: View>: View {
 
         if let item = appState.history.pressedShortcutItem {
           appState.navigator.select(item: item)
+          // Capture the modifiers now; they may be released before the task runs.
+          let modifierFlags = NSEvent.ModifierFlags.currentModifierFlags
           Task {
             try? await Task.sleep(for: .milliseconds(50))
-            appState.history.select(item, flags: .currentModifierFlags)
+            appState.history.select(item, flags: modifierFlags)
           }
           return .handled
         }

@@ -27,9 +27,10 @@ class Throttler {
     // If the time since the previous run is more than the required minimum delay
     // => execute the workItem immediately
     // else
-    // => delay the workItem execution by the minimum delay time
-    let delay = previousRun.timeIntervalSinceNow > minimumDelay ? 0 : minimumDelay
-    queue.asyncAfter(deadline: .now() + Double(delay), execute: workItem)
+    // => delay the workItem until the minimum delay has passed since the previous run
+    let elapsed = -previousRun.timeIntervalSinceNow
+    let delay = elapsed >= minimumDelay ? 0 : minimumDelay - elapsed
+    queue.asyncAfter(deadline: .now() + delay, execute: workItem)
   }
 
   func cancel() {
